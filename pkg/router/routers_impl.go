@@ -24,7 +24,7 @@ import (
 	"sort"
 	"strings"
 
-	"mosn.io/mosn/pkg/variable"
+	"mosn.io/pkg/variable"
 
 	"mosn.io/api"
 	v2 "mosn.io/mosn/pkg/config/v2"
@@ -63,7 +63,7 @@ func (a WildcardVirtualHostWithPortSlice) Swap(i, j int) {
 	a[i], a[j] = a[j], a[i]
 }
 
-//realization is not the same as normal less, simplify the reverse op
+// realization is not the same as normal less, simplify the reverse op
 func (a WildcardVirtualHostWithPortSlice) Less(i, j int) bool {
 	return a[j].hostLen < a[i].hostLen
 }

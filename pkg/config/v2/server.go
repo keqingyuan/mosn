@@ -52,19 +52,26 @@ type ListenerType string
 const EGRESS ListenerType = "egress"
 const INGRESS ListenerType = "ingress"
 
+// OriginalDstType: TProxy or Redirect
+type OriginalDstType string
+
+const TPROXY OriginalDstType = "tproxy"
+const REDIRECT OriginalDstType = "redirect"
+
 type ListenerConfig struct {
 	Name                  string              `json:"name,omitempty"`
 	Type                  ListenerType        `json:"type,omitempty"`
 	AddrConfig            string              `json:"address,omitempty"`
 	BindToPort            bool                `json:"bind_port,omitempty"`
 	Network               string              `json:"network,omitempty"`
-	UseOriginalDst        bool                `json:"use_original_dst,omitempty"`
+	OriginalDst           OriginalDstType     `json:"use_original_dst,omitempty"`
 	AccessLogs            []AccessLog         `json:"access_logs,omitempty"`
 	ListenerFilters       []Filter            `json:"listener_filters,omitempty"`
 	FilterChains          []FilterChain       `json:"filter_chains,omitempty"` // only one filterchains at this time
 	StreamFilters         []Filter            `json:"stream_filters,omitempty"`
 	Inspector             bool                `json:"inspector,omitempty"`
 	ConnectionIdleTimeout *api.DurationConfig `json:"connection_idle_timeout,omitempty"`
+	DefaultReadBufferSize int                 `json:"default_read_buffer_size,omitempty"`
 }
 
 // Listener contains the listener's information
@@ -122,6 +129,13 @@ func (l *Listener) UnmarshalJSON(b []byte) error {
 	l.Addr = addr
 	l.PerConnBufferLimitBytes = defaultBufferLimit
 	return nil
+}
+
+func (l *Listener) IsOriginalDst() bool {
+	if l.OriginalDst == TPROXY || l.OriginalDst == REDIRECT {
+		return true
+	}
+	return false
 }
 
 // AccessLog for making up access log

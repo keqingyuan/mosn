@@ -27,9 +27,13 @@ import (
 	"mosn.io/mosn/pkg/configmanager"
 	"mosn.io/mosn/pkg/istio"
 	"mosn.io/mosn/pkg/log"
+	"mosn.io/mosn/pkg/metrics"
+	"mosn.io/mosn/pkg/metrics/shm"
+	"mosn.io/mosn/pkg/metrics/sink"
 	"mosn.io/mosn/pkg/network"
 	"mosn.io/mosn/pkg/router"
 	"mosn.io/mosn/pkg/server"
+	"mosn.io/mosn/pkg/server/pid"
 	"mosn.io/mosn/pkg/stagemanager"
 	"mosn.io/mosn/pkg/types"
 	"mosn.io/mosn/pkg/upstream/cluster"
@@ -79,6 +83,9 @@ func (m *Mosn) Init(c *v2.MOSNConfig) error {
 
 	log.StartLogger.Infof("[mosn start] init the members of the mosn")
 
+	// after inherit config,
+	// since metrics need the isFromUpgrade flag in Mosn
+	m.initializeMetrics()
 	m.initClusterManager()
 	m.initServer()
 
@@ -135,10 +142,35 @@ func (m *Mosn) inheritConfig(c *v2.MOSNConfig) (err error) {
 	}
 	log.StartLogger.Infof("[mosn] [NewMosn] new mosn created")
 	// start init services
-	if err = store.StartService(nil); err != nil {
+	if err = store.StartService(m.Upgrade.InheritListeners); err != nil {
 		log.StartLogger.Errorf("[mosn] [NewMosn] start service failed: %v, exit", err)
 	}
 	return
+}
+
+func (m *Mosn) initializeMetrics() {
+	metrics.FlushMosnMetrics = true
+	config := m.Config.Metrics
+
+	// init shm zone
+	if config.ShmZone != "" && config.ShmSize > 0 {
+		shm.InitDefaultMetricsZone(config.ShmZone, int(config.ShmSize), !m.IsFromUpgrade())
+	}
+
+	// set metrics package
+	statsMatcher := config.StatsMatcher
+	metrics.SetStatsMatcher(statsMatcher.RejectAll, statsMatcher.ExclusionLabels, statsMatcher.ExclusionKeys)
+	metrics.SetMetricsFeature(config.FlushMosn, config.LazyFlush)
+	// create sinks
+	for _, cfg := range config.SinkConfigs {
+		_, err := sink.CreateMetricsSink(cfg.Type, cfg.Config)
+		// abort
+		if err != nil {
+			log.StartLogger.Errorf("[mosn] [init metrics] %s. %v metrics sink is turned off", err, cfg.Type)
+			return
+		}
+		log.StartLogger.Infof("[mosn] [init metrics] create metrics sink: %v", cfg.Type)
+	}
 }
 
 type clusterManagerFilter struct {
@@ -159,9 +191,9 @@ func (m *Mosn) initClusterManager() {
 	clusters, clusterMap := configmanager.ParseClusterConfig(c.ClusterManager.Clusters)
 	// create cluster manager
 	if mode := c.Mode(); mode == v2.Xds {
-		m.Clustermanager = cluster.NewClusterManagerSingleton(nil, nil, &c.ClusterManager.TLSContext)
+		m.Clustermanager = cluster.NewClusterManagerSingleton(nil, nil, &c.ClusterManager)
 	} else {
-		m.Clustermanager = cluster.NewClusterManagerSingleton(clusters, clusterMap, &c.ClusterManager.TLSContext)
+		m.Clustermanager = cluster.NewClusterManagerSingleton(clusters, clusterMap, &c.ClusterManager)
 	}
 
 }
@@ -375,14 +407,20 @@ func (m *Mosn) Shutdown() error {
 	return nil
 }
 
-func (m *Mosn) Close() {
+func (m *Mosn) Close(isUpgrade bool) {
 	log.StartLogger.Infof("[mosn close] mosn stop server")
+
+	// do not remove the pid file,
+	// since the new started server may have the same pid file
+	if !isUpgrade {
+		pid.RemovePidFile()
+		// stop reconfigure domain socket
+		server.StopReconfigureHandler()
+
+	}
 
 	// close service
 	store.CloseService()
-
-	// stop reconfigure domain socket
-	server.StopReconfigureHandler()
 
 	// stop mosn server
 	for _, srv := range m.servers {
