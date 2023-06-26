@@ -31,7 +31,7 @@ require (
 	github.com/opentrx/seata-golang/v2 v2.0.4
 	github.com/openzipkin/zipkin-go v0.2.2
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.9.0
+	github.com/prometheus/client_golang v1.11.1
 	github.com/prometheus/client_model v0.2.0
 	github.com/rcrowley/go-metrics v0.0.0-20200313005456-10cdbea86bc0
 	github.com/stretchr/testify v1.8.0
@@ -54,10 +54,10 @@ require (
 	istio.io/api v0.0.0-20211103171850-665ed2b92d52
 	istio.io/gogo-genproto v0.0.0-20210113155706-4daf5697332f
 	k8s.io/klog v1.0.0
-	mosn.io/api v1.4.0
+	mosn.io/api v1.5.0
 	mosn.io/envoy-go-extension v0.0.0-20221230083446-5b8dd13435c7
 	mosn.io/holmes v1.1.0
-	mosn.io/pkg v1.4.0
+	mosn.io/pkg v1.5.1-0.20230525074748-e3528eae50d9
 	mosn.io/proxy-wasm-go-host v0.2.1-0.20230303015731-d5007ceaba4f
 	vimagination.zapto.org/byteio v0.0.0-20200222190125-d27cba0f0b10
 )
@@ -106,8 +106,8 @@ require (
 	github.com/oklog/run v1.0.0 // indirect
 	github.com/pierrec/lz4 v2.0.5+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/common v0.15.0 // indirect
-	github.com/prometheus/procfs v0.2.0 // indirect
+	github.com/prometheus/common v0.26.0 // indirect
+	github.com/prometheus/procfs v0.6.0 // indirect
 	github.com/russross/blackfriday/v2 v2.0.1 // indirect
 	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/shirou/gopsutil v3.20.11+incompatible // indirect

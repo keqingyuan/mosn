@@ -30,13 +30,14 @@ type leastActiveConnectionLoadBalancer struct {
 	activeConnectionBias float64
 }
 
-func newleastActiveConnectionLoadBalancer(info types.ClusterInfo, hosts types.HostSet) types.LoadBalancer {
+func newLeastActiveConnectionLoadBalancer(info types.ClusterInfo, hosts types.HostSet) types.LoadBalancer {
 	lb := &leastActiveConnectionLoadBalancer{}
 	if info != nil && info.LbConfig() != nil {
 		lb.choice = info.LbConfig().ChoiceCount
 		lb.activeConnectionBias = info.LbConfig().ActiveRequestBias
 	} else {
-		lb.choice = default_choice
+		lb.choice = defaultChoice
+		lb.activeConnectionBias = defaultActiveRequestBias
 	}
 	lb.EdfLoadBalancer = newEdfLoadBalancer(info, hosts, lb.unweightChooseHost, lb.hostWeight)
 	return lb
@@ -48,19 +49,11 @@ func (lb *leastActiveConnectionLoadBalancer) hostWeight(item WeightItem) float64
 		return float64(item.Weight())
 	}
 
-	weight := float64(host.Weight())
+	weight := fixHostWeight(float64(host.Weight()))
 
-	activeConnection := host.HostStats().UpstreamConnectionActive.Count() + 1
+	biasedActiveConnection := math.Pow(float64(host.HostStats().UpstreamConnectionActive.Count())+1, lb.activeConnectionBias)
 
-	if activeConnection == 1 || lb.activeConnectionBias == 0.0 {
-		return weight
-	}
-
-	if lb.activeConnectionBias == 1.0 {
-		return weight / float64(activeConnection)
-	}
-
-	return weight / math.Pow(float64(activeConnection), lb.activeConnectionBias)
+	return weight / biasedActiveConnection
 }
 
 // 1. This LB rely on HostStats, so make sure the host metrics statistic is enabled

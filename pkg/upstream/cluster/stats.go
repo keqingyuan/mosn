@@ -18,9 +18,15 @@
 package cluster
 
 import (
+	"math"
+	"time"
+
 	"mosn.io/mosn/pkg/metrics"
+	"mosn.io/mosn/pkg/metrics/ewma"
 	"mosn.io/mosn/pkg/types"
 )
+
+var alpha = ewma.Alpha(math.Exp(-5), 30*time.Second) //nolint:gomnd
 
 func newHostStats(clustername string, addr string) *types.HostStats {
 	s := metrics.NewHostStats(clustername, addr)
@@ -43,9 +49,13 @@ func newHostStats(clustername string, addr string) *types.HostStats {
 		UpstreamRequestFailureEject:                    s.Counter(metrics.UpstreamRequestFailureEject),
 		UpstreamRequestPendingOverflow:                 s.Counter(metrics.UpstreamRequestPendingOverflow),
 		UpstreamRequestDuration:                        s.Histogram(metrics.UpstreamRequestDuration),
+		UpstreamRequestDurationEWMA:                    s.EWMA(metrics.UpstreamRequestDurationEWMA, alpha),
 		UpstreamRequestDurationTotal:                   s.Counter(metrics.UpstreamRequestDurationTotal),
 		UpstreamResponseSuccess:                        s.Counter(metrics.UpstreamResponseSuccess),
 		UpstreamResponseFailed:                         s.Counter(metrics.UpstreamResponseFailed),
+		UpstreamResponseTotalEWMA:                      s.EWMA(metrics.UpstreamResponseTotalEWMA, alpha),
+		UpstreamResponseClientErrorEWMA:                s.EWMA(metrics.UpstreamResponseClientErrorEWMA, alpha),
+		UpstreamResponseServerErrorEWMA:                s.EWMA(metrics.UpstreamResponseServerErrorEWMA, alpha),
 	}
 }
 
@@ -74,10 +84,19 @@ func newClusterStats(clustername string) *types.ClusterStats {
 		UpstreamRequestFailureEject:                    s.Counter(metrics.UpstreamRequestFailureEject),
 		UpstreamRequestPendingOverflow:                 s.Counter(metrics.UpstreamRequestPendingOverflow),
 		UpstreamRequestDuration:                        s.Histogram(metrics.UpstreamRequestDuration),
+		UpstreamRequestDurationEWMA:                    s.EWMA(metrics.UpstreamRequestDurationEWMA, alpha),
 		UpstreamRequestDurationTotal:                   s.Counter(metrics.UpstreamRequestDurationTotal),
 		UpstreamResponseSuccess:                        s.Counter(metrics.UpstreamResponseSuccess),
 		UpstreamResponseFailed:                         s.Counter(metrics.UpstreamResponseFailed),
 		LBSubSetsFallBack:                              s.Counter(metrics.UpstreamLBSubSetsFallBack),
 		LBSubsetsCreated:                               s.Gauge(metrics.UpstreamLBSubsetsCreated),
 	}
+}
+
+func GetAlpha() float64 {
+	return alpha
+}
+
+func SetAlpha(a float64) {
+	alpha = a
 }

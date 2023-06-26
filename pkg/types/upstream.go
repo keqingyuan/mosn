@@ -277,9 +277,13 @@ type HostStats struct {
 	UpstreamRequestFailureEject                    metrics.Counter
 	UpstreamRequestPendingOverflow                 metrics.Counter
 	UpstreamRequestDuration                        metrics.Histogram
+	UpstreamRequestDurationEWMA                    metrics.EWMA
 	UpstreamRequestDurationTotal                   metrics.Counter
 	UpstreamResponseSuccess                        metrics.Counter
 	UpstreamResponseFailed                         metrics.Counter
+	UpstreamResponseTotalEWMA                      metrics.EWMA
+	UpstreamResponseClientErrorEWMA                metrics.EWMA
+	UpstreamResponseServerErrorEWMA                metrics.EWMA
 }
 
 // ClusterStats defines a cluster's statistics information
@@ -306,6 +310,7 @@ type ClusterStats struct {
 	UpstreamRequestFailureEject                    metrics.Counter
 	UpstreamRequestPendingOverflow                 metrics.Counter
 	UpstreamRequestDuration                        metrics.Histogram
+	UpstreamRequestDurationEWMA                    metrics.EWMA
 	UpstreamRequestDurationTotal                   metrics.Counter
 	UpstreamResponseSuccess                        metrics.Counter
 	UpstreamResponseFailed                         metrics.Counter
