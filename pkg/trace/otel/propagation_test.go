@@ -15,29 +15,26 @@
  * limitations under the License.
  */
 
-package istio
+package otel
 
 import (
-	"io/ioutil"
-	"os"
-	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
+	"github.com/valyala/fasthttp"
+	"mosn.io/mosn/pkg/protocol/http"
 )
 
-func TestGetPodLabels(t *testing.T) {
-	IstioPodInfoPath = "/tmp/test/pod"
-	os.RemoveAll(IstioPodInfoPath)
-	err := os.MkdirAll(IstioPodInfoPath, 0755)
-	require.Nil(t, err)
-	data := []byte("labela=1\nlabelb=2\nlabelc=\"c\"")
-	err = ioutil.WriteFile(filepath.Join(IstioPodInfoPath, "labels"), data, 0644)
-	require.Nil(t, err)
-	labels := GetPodLabels()
-	require.Len(t, labels, 3)
-	require.Equal(t, "1", labels["labela"])
-	require.Equal(t, "2", labels["labelb"])
-	require.Equal(t, "c", labels["labelc"])
+func TestHTTPHeadersCarrier(t *testing.T) {
+	testKey, testValue := "Key", "Value"
 
+	carrier := HTTPHeadersCarrier{&http.RequestHeader{
+		RequestHeader: &fasthttp.RequestHeader{},
+	}}
+	carrier.Set(testKey, testValue)
+	assert.Equal(t, testValue, carrier.Get(testKey))
+
+	keys := carrier.Keys()
+	assert.Equal(t, 1, len(keys))
+	assert.Equal(t, testKey, keys[0])
 }

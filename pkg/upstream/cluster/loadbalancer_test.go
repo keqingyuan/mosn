@@ -477,7 +477,7 @@ func TestLeastActiveRequestLoadBalancer_ChooseHost(t *testing.T) {
 	verify := func(t *testing.T, info types.ClusterInfo, delta float64) {
 		bias := 1.0
 		if info != nil && info.LbConfig() != nil {
-			bias = info.LbConfig().ActiveRequestBias
+			bias = *info.LbConfig().ActiveRequestBias
 		}
 
 		hosts := createHostsetWithStats(exampleHostConfigs(), "test")
@@ -517,16 +517,18 @@ func TestLeastActiveRequestLoadBalancer_ChooseHost(t *testing.T) {
 		verify(t, nil, 1e-4)
 	})
 	t.Run("low bias", func(t *testing.T) {
+		activeRequestBias := 0.5
 		verify(t, &clusterInfo{
 			lbConfig: &v2.LbConfig{
-				ActiveRequestBias: 0.5,
+				ActiveRequestBias: &activeRequestBias,
 			},
 		}, 1e-4)
 	})
 	t.Run("high bias", func(t *testing.T) {
+		activeRequestBias := 1.5
 		verify(t, &clusterInfo{
 			lbConfig: &v2.LbConfig{
-				ActiveRequestBias: 1.5,
+				ActiveRequestBias: &activeRequestBias,
 			},
 		}, 1e-4)
 	})
@@ -1116,8 +1118,10 @@ func Test_PeakEwmaLoadBalancer(t *testing.T) {
 	})
 
 	t.Run("should choose average smallest score with biasedActiveRequest in small cluster", func(t *testing.T) {
+		var choiceCount uint32 = 2
+		var activeRequestBias float64 = 3.0
 		info := &clusterInfo{
-			lbConfig: &v2.LbConfig{ChoiceCount: 2, ActiveRequestBias: 3.0},
+			lbConfig: &v2.LbConfig{ChoiceCount: &choiceCount, ActiveRequestBias: &activeRequestBias},
 			stats:    newClusterStats("mock"),
 		}
 
@@ -1281,6 +1285,24 @@ func Test_PeakEwmaLoadBalancer(t *testing.T) {
 			score := lb.unweightedPeakEwmaScore(host)
 			assert.Less(t, score, prescore)
 			prescore = score
+		}
+	})
+
+	t.Run("ewma error rate is affected by bias", func(t *testing.T) {
+		host := &mockHost{stats: newHostStats("mock", "127.0.0.1")}
+		host.HostStats().UpstreamRequestDurationEWMA.Update(1)
+		host.HostStats().UpstreamResponseTotalEWMA.Update(10)
+		host.HostStats().UpstreamResponseClientErrorEWMA.Update(1)
+		host.HostStats().UpstreamResponseServerErrorEWMA.Update(1)
+
+		lb := peakEwmaLoadBalancer{}                                            // for `host` and `unweightedPeakEwmaScore`
+		lb2 := peakEwmaLoadBalancer{serverErrorBias: 2.0, clientErrorBias: 2.0} // for `host2` and `unweightedPeakEwmaScore`
+
+		for i := 0; i < 10; i++ {
+			now = now.Add(time.Second)
+			score := lb.unweightedPeakEwmaScore(host)
+			score2 := lb2.unweightedPeakEwmaScore(host)
+			assert.Less(t, score, score2)
 		}
 	})
 }

@@ -238,6 +238,8 @@ func (lb *WRRLoadBalancer) unweightChooseHost(context types.LoadBalancerContext)
 
 const defaultChoice = 2
 const defaultActiveRequestBias = 1.0
+const defaultClientErrorBias = 1.0
+const defaultServerErrorBias = 1.0
 
 // leastActiveRequestLoadBalancer choose the host with the least active request
 type leastActiveRequestLoadBalancer struct {
@@ -248,13 +250,15 @@ type leastActiveRequestLoadBalancer struct {
 
 func newLeastActiveRequestLoadBalancer(info types.ClusterInfo, hosts types.HostSet) types.LoadBalancer {
 	lb := &leastActiveRequestLoadBalancer{}
-	if info != nil && info.LbConfig() != nil {
-		lb.choice = info.LbConfig().ChoiceCount
-		lb.activeRequestBias = info.LbConfig().ActiveRequestBias
-	} else {
+
+	if info == nil || info.LbConfig() == nil {
 		lb.choice = defaultChoice
 		lb.activeRequestBias = defaultActiveRequestBias
+	} else {
+		lb.choice = LoadConfigValueUint32(info.LbConfig().ChoiceCount, defaultChoice)
+		lb.activeRequestBias = LoadConfigValueFloat64(info.LbConfig().ActiveRequestBias, defaultActiveRequestBias)
 	}
+
 	lb.EdfLoadBalancer = newEdfLoadBalancer(info, hosts, lb.unweightChooseHost, lb.hostWeight)
 	return lb
 }
@@ -645,8 +649,9 @@ type peakEwmaLoadBalancer struct {
 
 	choice            uint32
 	activeRequestBias float64
-
-	defaultDuration time.Duration
+	clientErrorBias   float64
+	serverErrorBias   float64
+	defaultDuration   time.Duration
 }
 
 func newPeakEwmaLoadBalancer(info types.ClusterInfo, hosts types.HostSet) types.LoadBalancer {
@@ -654,12 +659,16 @@ func newPeakEwmaLoadBalancer(info types.ClusterInfo, hosts types.HostSet) types.
 	lb.rrLB = rrFactory.newRoundRobinLoadBalancer(info, hosts)
 	lb.EdfLoadBalancer = newEdfLoadBalancer(info, hosts, lb.unweightedChoose, lb.hostWeight)
 
-	if info != nil && info.LbConfig() != nil {
-		lb.choice = info.LbConfig().ChoiceCount
-		lb.activeRequestBias = info.LbConfig().ActiveRequestBias
-	} else {
+	if info == nil || info.LbConfig() == nil {
 		lb.choice = defaultChoice
 		lb.activeRequestBias = defaultActiveRequestBias
+		lb.clientErrorBias = defaultClientErrorBias
+		lb.serverErrorBias = defaultServerErrorBias
+	} else {
+		lb.choice = LoadConfigValueUint32(info.LbConfig().ChoiceCount, defaultChoice)
+		lb.activeRequestBias = LoadConfigValueFloat64(info.LbConfig().ActiveRequestBias, defaultActiveRequestBias)
+		lb.clientErrorBias = LoadConfigValueFloat64(info.LbConfig().ClientErrorBias, defaultClientErrorBias)
+		lb.serverErrorBias = LoadConfigValueFloat64(info.LbConfig().ServerErrorBias, defaultServerErrorBias)
 	}
 
 	if info != nil {
@@ -802,10 +811,30 @@ func (lb *peakEwmaLoadBalancer) unweightedPeakEwmaScore(h types.Host) float64 {
 	clientErrorRate := responseClientError / (responseTotal + 1)
 	serverErrorRate := responseServerError / (responseTotal + 1)
 
-	successRate := (1 - clientErrorRate) * (1 - serverErrorRate)
+	successRate := math.Pow(1-clientErrorRate, lb.clientErrorBias) * math.Pow(1-serverErrorRate, lb.serverErrorBias)
 	if successRate < minPeakEwmaSuccessRate {
 		successRate = minPeakEwmaSuccessRate
 	}
 
 	return duration * biasedActiveRequest / successRate
+}
+
+// LoadConfigValueFloat64 If it is nil after JSON.Unmarshal, it will be set to default value
+//
+//lint:ignore unparam reason for ignoring
+func LoadConfigValueFloat64(configOption *float64, defaultValue float64) float64 {
+	if configOption != nil {
+		return *configOption
+	}
+	return defaultValue
+}
+
+// LoadConfigValueUint32 If it is nil after JSON.Unmarshal, it will be set to default value
+//
+//lint:ignore unparam reason for ignoring
+func LoadConfigValueUint32(configOption *uint32, defaultValue uint32) uint32 {
+	if configOption != nil {
+		return *configOption
+	}
+	return defaultValue
 }

@@ -15,29 +15,32 @@
  * limitations under the License.
  */
 
-package istio
+package otel
 
 import (
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"testing"
-
-	"github.com/stretchr/testify/require"
+	"mosn.io/api"
 )
 
-func TestGetPodLabels(t *testing.T) {
-	IstioPodInfoPath = "/tmp/test/pod"
-	os.RemoveAll(IstioPodInfoPath)
-	err := os.MkdirAll(IstioPodInfoPath, 0755)
-	require.Nil(t, err)
-	data := []byte("labela=1\nlabelb=2\nlabelc=\"c\"")
-	err = ioutil.WriteFile(filepath.Join(IstioPodInfoPath, "labels"), data, 0644)
-	require.Nil(t, err)
-	labels := GetPodLabels()
-	require.Len(t, labels, 3)
-	require.Equal(t, "1", labels["labela"])
-	require.Equal(t, "2", labels["labelb"])
-	require.Equal(t, "c", labels["labelc"])
+type HTTPHeadersCarrier struct {
+	request api.HeaderMap
+}
 
+func (h HTTPHeadersCarrier) Get(key string) (value string) {
+	value, _ = h.request.Get(key)
+	return
+}
+
+func (h HTTPHeadersCarrier) Set(key, value string) {
+	h.request.Set(key, value)
+}
+
+func (h HTTPHeadersCarrier) Keys() []string {
+
+	keys := make([]string, 0)
+	h.request.Range(func(key, value string) bool {
+		keys = append(keys, key)
+		return true
+	})
+
+	return keys
 }

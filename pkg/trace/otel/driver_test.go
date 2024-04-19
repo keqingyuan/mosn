@@ -15,29 +15,37 @@
  * limitations under the License.
  */
 
-package istio
+package otel
 
 import (
-	"io/ioutil"
-	"os"
-	"path/filepath"
+	"context"
 	"testing"
+	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
+	"mosn.io/api"
+	"mosn.io/mosn/pkg/types"
 )
 
-func TestGetPodLabels(t *testing.T) {
-	IstioPodInfoPath = "/tmp/test/pod"
-	os.RemoveAll(IstioPodInfoPath)
-	err := os.MkdirAll(IstioPodInfoPath, 0755)
-	require.Nil(t, err)
-	data := []byte("labela=1\nlabelb=2\nlabelc=\"c\"")
-	err = ioutil.WriteFile(filepath.Join(IstioPodInfoPath, "labels"), data, 0644)
-	require.Nil(t, err)
-	labels := GetPodLabels()
-	require.Len(t, labels, 3)
-	require.Equal(t, "1", labels["labela"])
-	require.Equal(t, "2", labels["labelb"])
-	require.Equal(t, "c", labels["labelc"])
+type mockTracer struct {
+}
+
+//goland:noinspection GoUnusedParameter
+func (receiver *mockTracer) Start(ctx context.Context, request interface{}, startTime time.Time) api.Span {
+	return nil
+}
+
+func TestNewOtelImpl(t *testing.T) {
+	protocol := types.ProtocolName("test")
+
+	otelDriver := NewOtelImpl()
+	otelDriver.Register(protocol, func(config map[string]interface{}) (tracer api.Tracer, err error) {
+		return &mockTracer{}, nil
+	})
+
+	_ = otelDriver.Init(nil)
+
+	mockTracer := otelDriver.Get(protocol)
+	assert.NotNil(t, mockTracer)
 
 }
